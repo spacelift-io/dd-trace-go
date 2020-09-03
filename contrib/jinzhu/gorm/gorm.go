@@ -129,5 +129,5 @@ func after(scope *gorm.Scope, operationName string) {
 	}
 
 	span, _ := tracer.StartSpanFromContext(ctx, operationName, opts...)
-	span.Finish(tracer.WithError(scope.DB().Error))
+	span.Finish(tracer.WithError(cfg.errorFn(scope.DB())))
 }

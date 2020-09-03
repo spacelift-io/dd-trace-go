@@ -16,6 +16,7 @@ import (
 type config struct {
 	serviceName   string
 	analyticsRate float64
+	errorFn       func(*gorm.DB) error
 	dsn           string
 	tagFns        map[string]func(scope *gorm.Scope) interface{}
 }
@@ -31,6 +32,7 @@ func defaults(cfg *config) {
 	} else {
 		cfg.analyticsRate = math.NaN()
 	}
+	cfg.errorFn = func(db *gorm.DB) error { return db.Error }
 	cfg.tagFns = make(map[string]func(scope *gorm.Scope) interface{})
 }
 
@@ -70,5 +72,15 @@ func WithAnalyticsRate(rate float64) Option {
 func WithCustomTag(tag string, tagFn func(scope *gorm.Scope) interface{}) Option {
 	return func(cfg *config) {
 		cfg.tagFns[tag] = tagFn
+	}
+}
+
+// WithErrorFunction will cause the given function to be evaluated on each error
+// before it is reported by the closing span.
+func WithErrorFunction(fn func(*gorm.DB) error) Option {
+	return func(cfg *config) {
+		if fn != nil {
+			cfg.errorFn = fn
+		}
 	}
 }
