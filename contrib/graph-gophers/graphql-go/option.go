@@ -13,9 +13,10 @@ import (
 )
 
 type config struct {
-	serviceName   string
-	analyticsRate float64
-	omitTrivial   bool
+	serviceName         string
+	analyticsRate       float64
+	omitTrivial         bool
+	operationAsResource bool
 }
 
 // Option represents an option that can be used customize the Tracer.
@@ -68,5 +69,12 @@ func WithAnalyticsRate(rate float64) Option {
 func WithOmitTrivial() Option {
 	return func(cfg *config) {
 		cfg.omitTrivial = true
+	}
+}
+
+// WithOperationAsResource sets operation as resource name, whenever available.
+func WithOperationAsResource() Option {
+	return func(cfg *config) {
+		cfg.operationAsResource = true
 	}
 }

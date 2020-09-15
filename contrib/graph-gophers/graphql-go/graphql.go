@@ -47,6 +47,11 @@ func (t *Tracer) TraceQuery(ctx context.Context, queryString string, operationNa
 		tracer.Tag(tagGraphqlOperationName, operationName),
 		tracer.Measured(),
 	}
+
+	if t.cfg.operationAsResource && operationName != "" {
+		opts = append(opts, tracer.ResourceName(operationName))
+	}
+
 	if !math.IsNaN(t.cfg.analyticsRate) {
 		opts = append(opts, tracer.Tag(ext.EventSampleRate, t.cfg.analyticsRate))
 	}
