@@ -44,7 +44,7 @@ func WrapSession(s *session.Session, opts ...Option) *session.Session {
 		Name: "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws/handlers.Send",
 		Fn:   h.Send,
 	})
-	s.Handlers.Complete.PushBackNamed(request.NamedHandler{
+	s.Handlers.CompleteAttempt.PushBackNamed(request.NamedHandler{
 		Name: "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws/handlers.Complete",
 		Fn:   h.Complete,
 	})
