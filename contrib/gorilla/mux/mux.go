@@ -94,16 +94,19 @@ func NewRouter(opts ...RouterOption) *Router {
 // We only need to rewrite this function to be able to trace
 // all the incoming requests to the underlying multiplexer
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	var (
-		match    mux.RouteMatch
-		spanopts []ddtrace.StartSpanOption
-	)
+	var match mux.RouteMatch
+	spanopts := []ddtrace.StartSpanOption{
+		tracer.Tag("http.hostname", req.Host),
+		tracer.Tag("http.content-length", req.ContentLength),
+	}
+
 	// get the resource associated to this request
 	if r.Match(req, &match) && match.Route != nil {
 		if h, err := match.Route.GetHostTemplate(); err == nil {
 			spanopts = append(spanopts, tracer.Tag("mux.host", h))
 		}
 	}
+
 	spanopts = append(spanopts, r.config.spanOpts...)
 	resource := r.config.resourceNamer(r, req)
 	httputil.TraceAndServe(r.Router, w, req, r.config.serviceName, resource, r.config.finishOpts, spanopts...)

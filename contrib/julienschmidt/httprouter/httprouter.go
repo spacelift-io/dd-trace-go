@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/internal/httputil"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
@@ -43,9 +44,18 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// get the resource associated to this request
 	route := req.URL.Path
 	_, ps, _ := r.Router.Lookup(req.Method, route)
+
 	for _, param := range ps {
 		route = strings.Replace(route, param.Value, ":"+param.Key, 1)
 	}
+
 	resource := req.Method + " " + route
-	httputil.TraceAndServe(r.Router, w, req, r.config.serviceName, resource, nil, r.config.spanOpts...)
+
+	spanopts := []ddtrace.StartSpanOption{
+		tracer.Tag("http.hostname", req.Host),
+		tracer.Tag("http.content-length", req.ContentLength),
+	}
+	spanopts = append(spanopts, r.config.spanOpts...)
+
+	httputil.TraceAndServe(r.Router, w, req, r.config.serviceName, resource, nil, spanopts...)
 }
