@@ -253,6 +253,9 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 			return f.DataStreams
 		})
 	}
+	if c.traceWriter != nil {
+		writer = &multiTraceWriter{ws: []traceWriter{writer, c.traceWriter}}
+	}
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,

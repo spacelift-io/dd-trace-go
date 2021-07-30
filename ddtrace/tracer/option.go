@@ -163,6 +163,8 @@ type config struct {
 	// all spans.
 	globalTags dynamicConfig[map[string]interface{}]
 
+	traceWriter traceWriter
+
 	// transport specifies the Transport interface which will be used to send data to the agent.
 	transport transport
 
@@ -828,6 +830,13 @@ func WithService(name string) StartOption {
 func WithGlobalServiceName(enabled bool) StartOption {
 	return func(_ *config) {
 		namingschema.SetUseGlobalServiceName(enabled)
+	}
+}
+
+// WithService sets the default service name for the program.
+func WithCustomTraceWriter(traceWriter traceWriter) StartOption {
+	return func(c *config) {
+		c.traceWriter = traceWriter
 	}
 }
 
