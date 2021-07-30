@@ -169,6 +169,9 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	} else {
 		writer = newAgentTraceWriter(c, sampler)
 	}
+	if c.traceWriter != nil {
+		writer = &multiTraceWriter{ws: []traceWriter{writer, c.traceWriter}}
+	}
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,
