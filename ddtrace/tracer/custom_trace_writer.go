@@ -59,49 +59,24 @@ func (h *customTraceWriter) flush() {
 		customSpans := make([]*CustomSpan, len(spans))
 		for i := range spans {
 			customSpans[i] = &CustomSpan{
-				Name: spans[i].Name,
-				Service: spans[i].Service,
+				Name:     spans[i].Name,
+				Service:  spans[i].Service,
 				Resource: spans[i].Resource,
-				Type: spans[i].Type,
-				Start: spans[i].Start,
+				Type:     spans[i].Type,
+				Start:    spans[i].Start,
 				Duration: spans[i].Duration,
-				Meta: spans[i].Meta,
-				Metrics: spans[i].Metrics,
-				SpanID: spans[i].SpanID,
-				TraceID: spans[i].TraceID,
+				Meta:     spans[i].Meta,
+				Metrics:  spans[i].Metrics,
+				SpanID:   spans[i].SpanID,
+				TraceID:  spans[i].TraceID,
 				ParentID: spans[i].ParentID,
-				Error: spans[i].Error,
+				Error:    spans[i].Error,
 			}
 		}
-		
+
 		if err := h.sendSpans(customSpans); err != nil {
 			log.Error("lost %d spans: %v", len(spans), err)
 		}
-
-		// records := make([]*firehose.Record, len(spans))
-		// for i := range spans {
-		// 	data, err := json.Marshal(&kinesisFirehoseSpan{
-		// 		Name:     spans[i].Name,
-		// 		Service:  spans[i].Service,
-		// 		Resource: spans[i].Resource,
-		// 		Type:     spans[i].Type,
-		// 		Start:    spans[i].Start,
-		// 		Duration: spans[i].Duration,
-		// 		Meta:     spans[i].Meta,
-		// 		Metrics:  spans[i].Metrics,
-		// 		SpanID:   spans[i].SpanID,
-		// 		TraceID:  spans[i].TraceID,
-		// 		ParentID: spans[i].ParentID,
-		// 		Error:    spans[i].Error,
-		// 	})
-		// 	if err != nil {
-		// 		log.Error("marshal failed, lost %d spans: %v", len(spans), err)
-		// 	}
-		// 	records[i] = &firehose.Record{
-		// 		Data: data,
-		// 	}
-		// }
-
 	}(h.spans)
 	h.spans = nil
 }
