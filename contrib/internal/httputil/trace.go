@@ -44,6 +44,7 @@ func TraceAndServe(h http.Handler, cfg *TraceConfig) {
 	if cfg.Request.URL.Host != "" {
 		opts = append([]ddtrace.StartSpanOption{
 			tracer.Tag("http.host", cfg.Request.URL.Host),
+			tracer.Tag("http.content-length", cfg.Request.ContentLength),
 		}, opts...)
 	}
 	if spanctx, err := tracer.Extract(tracer.HTTPHeadersCarrier(cfg.Request.Header)); err == nil {
