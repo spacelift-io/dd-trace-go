@@ -54,7 +54,7 @@ const (
 	defaultHostname    = "localhost"
 	defaultPort        = "8126"
 	defaultAddress     = defaultHostname + ":" + defaultPort
-	defaultHTTPTimeout = 2 * time.Second         // defines the current timeout before giving up with the send process
+	defaultHTTPTimeout = 10 * time.Second         // defines the current timeout before giving up with the send process
 	traceCountHeader   = "X-Datadog-Trace-Count" // header containing the number of traces in the payload
 )
 
