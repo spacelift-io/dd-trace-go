@@ -208,6 +208,9 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	if spans != nil {
 		c.spanRules = spans
 	}
+	if c.traceWriter != nil {
+		writer = &multiTraceWriter{ws: []traceWriter{writer, c.traceWriter}}
+	}
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,
