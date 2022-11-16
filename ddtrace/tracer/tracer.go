@@ -268,6 +268,9 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	if c.contribStats {
 		statsCarrier = globalinternal.NewStatsCarrier(statsd)
 	}
+	if c.traceWriter != nil {
+		writer = &multiTraceWriter{ws: []traceWriter{writer, c.traceWriter}}
+	}
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,
