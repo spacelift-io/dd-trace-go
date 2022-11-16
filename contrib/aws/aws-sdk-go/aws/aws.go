@@ -44,7 +44,7 @@ func WrapSession(s *session.Session, opts ...Option) *session.Session {
 		Name: "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws/handlers.Send",
 		Fn:   h.Send,
 	})
-	s.Handlers.Complete.PushBackNamed(request.NamedHandler{
+	s.Handlers.CompleteAttempt.PushBackNamed(request.NamedHandler{
 		Name: "gopkg.in/DataDog/dd-trace-go.v1/contrib/aws/aws-sdk-go/aws/handlers.Complete",
 		Fn:   h.Complete,
 	})
@@ -52,9 +52,6 @@ func WrapSession(s *session.Session, opts ...Option) *session.Session {
 }
 
 func (h *handlers) Send(req *request.Request) {
-	if req.RetryCount != 0 {
-		return
-	}
 	opts := []ddtrace.StartSpanOption{
 		tracer.SpanType(ext.SpanTypeHTTP),
 		tracer.ServiceName(h.serviceName(req)),
