@@ -163,6 +163,8 @@ type config struct {
 	// all spans.
 	globalTags dynamicConfig[map[string]interface{}]
 
+	traceWriter traceWriter
+	
 	// transport specifies the Transport interface which will be used to send data to the agent.
 	transport transport
 
@@ -847,11 +849,10 @@ func WithService(name string) StartOption {
 	}
 }
 
-// WithGlobalServiceName causes contrib libraries to use the global service name and not any locally defined service name.
-// This is synonymous with `DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED`.
-func WithGlobalServiceName(enabled bool) StartOption {
-	return func(_ *config) {
-		namingschema.SetUseGlobalServiceName(enabled)
+// WithService sets the default service name for the program.
+func WithCustomTraceWriter(traceWriter traceWriter) StartOption {
+	return func(c *config) {
+		c.traceWriter = traceWriter
 	}
 }
 
