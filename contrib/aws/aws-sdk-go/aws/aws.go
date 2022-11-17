@@ -72,6 +72,12 @@ func WrapSession(s *session.Session, opts ...Option) *session.Session {
 }
 
 func (h *handlers) Send(req *request.Request) {
+	// Make a copy of the URL so we don't modify the outgoing request
+	url := *req.HTTPRequest.URL
+	url.User = nil // Do not include userinfo in the HTTPURL tag.
+
+	region := awsRegion(req)
+
 	opts := []ddtrace.StartSpanOption{
 		tracer.SpanType(ext.SpanTypeHTTP),
 		tracer.ServiceName(h.serviceName(req)),

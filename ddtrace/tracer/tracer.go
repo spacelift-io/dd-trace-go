@@ -235,13 +235,16 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 		log.Warn("Runtime and health metrics disabled: %v", err)
 	}
 	var writer traceWriter
-	if c.ciVisibilityEnabled {
-		writer = newCiVisibilityTraceWriter(c)
-	} else if c.logToStdout {
+	if c.logToStdout {
 		writer = newLogTraceWriter(c, statsd)
 	} else {
 		writer = newAgentTraceWriter(c, sampler, statsd)
 	}
+
+	if c.traceWriter != nil {
+		writer = c.traceWriter
+	}
+
 	traces, spans, err := samplingRulesFromEnv()
 	if err != nil {
 		log.Warn("DIAGNOSTICS Error(s) parsing sampling rules: found errors:%s", err)
@@ -252,9 +255,22 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	if spans != nil {
 		c.spanRules = spans
 	}
-	if c.traceWriter != nil {
-		writer = &multiTraceWriter{ws: []traceWriter{writer, c.traceWriter}}
+	rulesSampler := newRulesSampler(c.traceRules, c.spanRules, c.globalSampleRate)
+	c.traceSampleRate = newDynamicConfig("trace_sample_rate", c.globalSampleRate, rulesSampler.traces.setGlobalSampleRate, equal[float64])
+	// If globalSampleRate returns NaN, it means the environment variable was not set or valid.
+	// We could always set the origin to "env_var" inconditionally, but then it wouldn't be possible
+	// to distinguish between the case where the environment variable was not set and the case where
+	// it default to NaN.
+	if !math.IsNaN(c.globalSampleRate) {
+		c.traceSampleRate.cfgOrigin = telemetry.OriginEnvVar
 	}
+	c.traceSampleRules = newDynamicConfig("trace_sample_rules", c.traceRules,
+		rulesSampler.traces.setTraceSampleRules, EqualsFalseNegative)
+	var dataStreamsProcessor *datastreams.Processor
+	if c.dataStreamsMonitoringEnabled {
+		dataStreamsProcessor = datastreams.NewProcessor(statsd, c.env, c.serviceName, c.version, c.agentURL, c.httpClient)
+	}
+
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,
@@ -721,9 +737,6 @@ func (t *tracer) sample(span *span) {
 		span.setMetric(sampleRateMetricKey, rs.Rate())
 	}
 	if t.rulesSampling.SampleTraceGlobalRate(span) {
-		return
-	}
-	if t.rulesSampling.SampleTrace(span) {
 		return
 	}
 	t.prioritySampling.apply(span)

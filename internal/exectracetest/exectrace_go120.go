@@ -1,11 +1,8 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2016 Datadog, Inc.
+// Copyright 2024 Datadog, Inc.
 
-package internal
+package exectracetest
 
-type contextKey struct{}
-
-// ActiveSpanKey is used to set tracer context on a context.Context objects with a unique key
-var ActiveSpanKey = contextKey{}
+// Placeholder -- the latestgolang.org/x/exp does not support go1.20

@@ -12,32 +12,25 @@ import (
 	"golang.org/x/mod/semver"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/internal"
-	"gopkg.in/DataDog/dd-trace-go.v1/internal/log"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/namingschema"
 )
 
 const defaultServiceName = "gocql.query"
 
-type config struct {
-	serviceName, resourceName            string
-	querySpanName, batchSpanName         string
-	noDebugStack                         bool
-	analyticsRate                        float64
-	errCheck                             func(err error) bool
-	customTags                           map[string]interface{}
-	clusterTagLegacyMode                 bool
-	traceQuery, traceBatch, traceConnect bool
+type queryConfig struct {
+	serviceName, resourceName    string
+	querySpanName, batchSpanName string
+	noDebugStack                 bool
+	analyticsRate                float64
+	errCheck                     func(err error) bool
+	customTags                   map[string]interface{}
 }
 
 // WrapOption represents an option that can be passed to WrapQuery.
 type WrapOption func(*config)
 
-func defaultConfig() *config {
-	cfg := &config{
-		traceQuery:   true,
-		traceBatch:   true,
-		traceConnect: true,
-	}
+func defaultConfig() *queryConfig {
+	cfg := &queryConfig{}
 	cfg.serviceName = namingschema.ServiceNameOverrideV0(defaultServiceName, defaultServiceName)
 	cfg.querySpanName = namingschema.OpName(namingschema.CassandraOutbound)
 	cfg.batchSpanName = namingschema.OpNameOverrideV0(namingschema.CassandraOutbound, "cassandra.batch")
@@ -133,34 +126,10 @@ func WithErrorCheck(fn func(err error) bool) WrapOption {
 
 // WithCustomTag will attach the value to the span tagged by the key.
 func WithCustomTag(key string, value interface{}) WrapOption {
-	return func(cfg *config) {
+	return func(cfg *queryConfig) {
 		if cfg.customTags == nil {
 			cfg.customTags = make(map[string]interface{})
 		}
 		cfg.customTags[key] = value
-	}
-}
-
-// WithTraceQuery will enable tracing for queries (default is true).
-// This option only takes effect in CreateTracedSession and NewObserver.
-func WithTraceQuery(enabled bool) WrapOption {
-	return func(cfg *config) {
-		cfg.traceQuery = enabled
-	}
-}
-
-// WithTraceBatch will enable tracing for batches (default is true).
-// This option only takes effect in CreateTracedSession and NewObserver.
-func WithTraceBatch(enabled bool) WrapOption {
-	return func(cfg *config) {
-		cfg.traceBatch = enabled
-	}
-}
-
-// WithTraceConnect will enable tracing for connections (default is true).
-// This option only takes effect in CreateTracedSession and NewObserver.
-func WithTraceConnect(enabled bool) WrapOption {
-	return func(cfg *config) {
-		cfg.traceConnect = enabled
 	}
 }

@@ -32,6 +32,7 @@ jobs:
         run: govulncheck ./ddtrace/... ./appsec/... ./profiler/... ./internal/...
       - name: Run govulncheck-contribs
         run: |
-          go list -f '{{.Dir}}' ./contrib/... | while read dir ; do
+          # Excluding legacy contrib grpc.v12
+          go list -f '{{.Dir}}' ./contrib/... | grep -v -e grpc.v12 | while read dir ; do
             govulncheck -C $dir .
           done

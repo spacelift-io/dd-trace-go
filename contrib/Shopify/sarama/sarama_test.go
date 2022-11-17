@@ -70,7 +70,9 @@ func genTestSpans(t *testing.T, serviceOverride string) []mocktracer.Span {
 	require.NoError(t, err)
 
 	pc, err := c.ConsumePartition("test-topic", 0, 0)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = <-pc.Messages()
 	err = pc.Close()
 	require.NoError(t, err)
@@ -140,9 +142,8 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, "Shopify/sarama", s.Tag(ext.Component))
 		assert.Equal(t, ext.SpanKindConsumer, s.Tag(ext.SpanKind))
 		assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
-
 		p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewConsumerMessageCarrier(msg1)))
-		require.True(t, ok, "pathway not found in context")
+		assert.True(t, ok)
 		expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:in", "topic:test-topic", "type:kafka")
 		expected, _ := datastreams.PathwayFromContext(expectedCtx)
 		assert.NotEqual(t, expected.GetHash(), 0)
@@ -164,9 +165,8 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, "Shopify/sarama", s.Tag(ext.Component))
 		assert.Equal(t, ext.SpanKindConsumer, s.Tag(ext.SpanKind))
 		assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
-
-		p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewConsumerMessageCarrier(msg2)))
-		require.True(t, ok, "pathway not found in context")
+		p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewConsumerMessageCarrier(msg1)))
+		assert.True(t, ok)
 		expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:in", "topic:test-topic", "type:kafka")
 		expected, _ := datastreams.PathwayFromContext(expectedCtx)
 		assert.NotEqual(t, expected.GetHash(), 0)
@@ -200,7 +200,9 @@ func TestSyncProducer(t *testing.T) {
 	cfg.Producer.Return.Successes = true
 
 	producer, err := sarama.NewSyncProducer([]string{seedBroker.Addr()}, cfg)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	producer = WrapSyncProducer(cfg, producer, WithDataStreams())
 
 	msg1 := &sarama.ProducerMessage{
@@ -224,9 +226,8 @@ func TestSyncProducer(t *testing.T) {
 		assert.Equal(t, "Shopify/sarama", s.Tag(ext.Component))
 		assert.Equal(t, ext.SpanKindProducer, s.Tag(ext.SpanKind))
 		assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
-
 		p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewProducerMessageCarrier(msg1)))
-		require.True(t, ok, "pathway not found in context")
+		assert.True(t, ok)
 		expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:out", "topic:my_topic", "type:kafka")
 		expected, _ := datastreams.PathwayFromContext(expectedCtx)
 		assert.NotEqual(t, expected.GetHash(), 0)
@@ -288,17 +289,6 @@ func TestSyncProducerSendMessages(t *testing.T) {
 		assert.Equal(t, ext.SpanKindProducer, s.Tag(ext.SpanKind))
 		assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
 	}
-
-	for _, msg := range []*sarama.ProducerMessage{msg1, msg2} {
-		p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewProducerMessageCarrier(msg)))
-		if !assert.True(t, ok, "pathway not found in context") {
-			continue
-		}
-		expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:out", "topic:my_topic", "type:kafka")
-		expected, _ := datastreams.PathwayFromContext(expectedCtx)
-		assert.NotEqual(t, expected.GetHash(), 0)
-		assert.Equal(t, expected.GetHash(), p.GetHash())
-	}
 }
 
 func TestAsyncProducer(t *testing.T) {
@@ -332,22 +322,11 @@ func TestAsyncProducer(t *testing.T) {
 			assert.Equal(t, "queue", s.Tag(ext.SpanType))
 			assert.Equal(t, "Produce Topic my_topic", s.Tag(ext.ResourceName))
 			assert.Equal(t, "kafka.produce", s.OperationName())
-
-			// these tags are set in the finishProducerSpan function, but in this case it's never used, and instead we
-			// automatically finish spans after being started because we don't have a way to know when they are finished.
-			assert.Nil(t, s.Tag(ext.MessagingKafkaPartition))
-			assert.Nil(t, s.Tag("offset"))
-
+			assert.Equal(t, int32(0), s.Tag(ext.MessagingKafkaPartition))
+			assert.Equal(t, int64(0), s.Tag("offset"))
 			assert.Equal(t, "Shopify/sarama", s.Tag(ext.Component))
 			assert.Equal(t, ext.SpanKindProducer, s.Tag(ext.SpanKind))
 			assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
-
-			p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewProducerMessageCarrier(msg1)))
-			require.True(t, ok, "pathway not found in context")
-			expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:out", "topic:my_topic", "type:kafka")
-			expected, _ := datastreams.PathwayFromContext(expectedCtx)
-			assert.NotEqual(t, expected.GetHash(), 0)
-			assert.Equal(t, expected.GetHash(), p.GetHash())
 		}
 	})
 
@@ -385,13 +364,6 @@ func TestAsyncProducer(t *testing.T) {
 			assert.Equal(t, "Shopify/sarama", s.Tag(ext.Component))
 			assert.Equal(t, ext.SpanKindProducer, s.Tag(ext.SpanKind))
 			assert.Equal(t, "kafka", s.Tag(ext.MessagingSystem))
-
-			p, ok := datastreams.PathwayFromContext(datastreams.ExtractFromBase64Carrier(context.Background(), NewProducerMessageCarrier(msg1)))
-			require.True(t, ok, "pathway not found in context")
-			expectedCtx, _ := tracer.SetDataStreamsCheckpoint(context.Background(), "direction:out", "topic:my_topic", "type:kafka")
-			expected, _ := datastreams.PathwayFromContext(expectedCtx)
-			assert.NotEqual(t, expected.GetHash(), 0)
-			assert.Equal(t, expected.GetHash(), p.GetHash())
 		}
 	})
 }

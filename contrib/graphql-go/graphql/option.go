@@ -6,27 +6,49 @@
 package graphql
 
 import (
-	"math"
-
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/namingschema"
 )
 
-const defaultServiceName = "graphql.server"
+const (
+	defaultClientServiceName = "grpc.client"
+	defaultServerServiceName = "grpc.server"
+)
 
-type config struct {
-	serviceName   string
-	analyticsRate float64
+type interceptorConfig struct {
+	serviceName string
+	spanName    string
+	spanOpts    []ddtrace.StartSpanOption
 }
 
 type Option func(*config)
 
-func defaults(cfg *config) {
-	cfg.serviceName = namingschema.ServiceName(defaultServiceName)
-	if internal.BoolEnv("DD_TRACE_GRAPHQL_ANALYTICS_ENABLED", false) {
-		cfg.analyticsRate = 1.0
-	} else {
-		cfg.analyticsRate = math.NaN()
+func defaults(cfg *interceptorConfig) {
+	// cfg.serviceName default set in interceptor
+	// cfg.spanOpts = append(cfg.spanOpts, tracer.AnalyticsRate(globalconfig.AnalyticsRate()))
+	if internal.BoolEnv("DD_TRACE_GRPC_ANALYTICS_ENABLED", false) {
+		cfg.spanOpts = append(cfg.spanOpts, tracer.AnalyticsRate(1.0))
+	}
+}
+
+func clientDefaults(cfg *interceptorConfig) {
+	cfg.serviceName = namingschema.ServiceNameOverrideV0(defaultClientServiceName, defaultClientServiceName)
+	cfg.spanName = namingschema.OpName(namingschema.GRPCClient)
+	defaults(cfg)
+}
+
+func serverDefaults(cfg *interceptorConfig) {
+	cfg.serviceName = namingschema.ServiceName(defaultServerServiceName)
+	cfg.spanName = namingschema.OpName(namingschema.GRPCServer)
+	defaults(cfg)
+}
+
+// WithServiceName sets the given service name for the intercepted client.
+func WithServiceName(name string) InterceptorOption {
+	return func(cfg *interceptorConfig) {
+		cfg.serviceName = name
 	}
 }
 
@@ -34,9 +56,7 @@ func defaults(cfg *config) {
 func WithAnalytics(on bool) Option {
 	return func(cfg *config) {
 		if on {
-			cfg.analyticsRate = 1.0
-		} else {
-			cfg.analyticsRate = math.NaN()
+			WithSpanOptions(tracer.AnalyticsRate(1.0))(cfg)
 		}
 	}
 }
@@ -46,16 +66,15 @@ func WithAnalytics(on bool) Option {
 func WithAnalyticsRate(rate float64) Option {
 	return func(cfg *config) {
 		if rate >= 0.0 && rate <= 1.0 {
-			cfg.analyticsRate = rate
-		} else {
-			cfg.analyticsRate = math.NaN()
+			WithSpanOptions(tracer.AnalyticsRate(rate))(cfg)
 		}
 	}
 }
 
-// WithServiceName sets the given service name for the client.
-func WithServiceName(name string) Option {
-	return func(cfg *config) {
-		cfg.serviceName = name
+// WithSpanOptions defines a set of additional ddtrace.StartSpanOption to be added
+// to spans started by the integration.
+func WithSpanOptions(opts ...ddtrace.StartSpanOption) InterceptorOption {
+	return func(cfg *interceptorConfig) {
+		cfg.spanOpts = append(cfg.spanOpts, opts...)
 	}
 }

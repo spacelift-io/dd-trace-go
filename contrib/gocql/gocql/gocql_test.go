@@ -42,6 +42,12 @@ func newTracedCassandraCluster(opts ...WrapOption) *ClusterConfig {
 }
 
 func updateTestClusterConfig(cfg *gocql.ClusterConfig) {
+	// the InitialHostLookup must be disabled in newer versions of
+	// gocql otherwise "no connections were made when creating the session"
+	// error is returned for Cassandra misconfiguration (that we don't need
+	// since we're testing another behavior and not the client).
+	// Check: https://github.com/gocql/gocql/issues/946
+	cfg.DisableInitialHostLookup = true
 	// the default timeouts (600ms) are sometimes too short in CI and cause
 	// PRs being tested to flake due to this integration.
 	cfg.ConnectTimeout = 2 * time.Second

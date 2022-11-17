@@ -6,8 +6,24 @@
 package pubsub
 
 import (
-	"gopkg.in/DataDog/dd-trace-go.v1/contrib/cloud.google.com/go/pubsub.v1/internal/tracing"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/namingschema"
 )
+
+type config struct {
+	serviceName     string
+	publishSpanName string
+	receiveSpanName string
+	measured        bool
+}
+
+func defaultConfig() *config {
+	return &config{
+		serviceName:     namingschema.ServiceNameOverrideV0("", ""),
+		publishSpanName: namingschema.OpName(namingschema.GCPPubSubOutbound),
+		receiveSpanName: namingschema.OpName(namingschema.GCPPubSubInbound),
+		measured:        false,
+	}
+}
 
 // Option is used to customize spans started by WrapReceiveHandler or Publish.
 type Option = tracing.Option

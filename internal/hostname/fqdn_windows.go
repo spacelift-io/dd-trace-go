@@ -3,12 +3,12 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package hostname
+//go:build cgo
 
-import (
-	"fmt"
-)
+package appsec
 
-func getSystemFQDN() (string, error) {
-	return "", fmt.Errorf("SystemFQDN provider not implemented for windows")
+func init() {
+	// Go doesn't provide any way to check if cgo is enabled, so we compute it
+	// ourselves with the cgo build tag.
+	cgoEnabled = true
 }
