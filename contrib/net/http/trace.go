@@ -11,12 +11,21 @@ import (
 	"net/http"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/internal/httptrace"
+	"gopkg.in/DataDog/dd-trace-go.v1/contrib/internal/options"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/appsec"
-	"gopkg.in/DataDog/dd-trace-go.v1/internal/appsec/dyngo/instrumentation/httpsec"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/appsec/emitter/httpsec"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/telemetry"
 )
+
+const componentName = "net/http"
+
+func init() {
+	telemetry.LoadIntegration(componentName)
+	tracer.MarkIntegrationImported(componentName)
+}
 
 // ServeConfig specifies the tracing configuration when using TraceAndServe.
 type ServeConfig struct {
@@ -45,8 +54,16 @@ func TraceAndServe(h http.Handler, w http.ResponseWriter, r *http.Request, cfg *
 	if cfg == nil {
 		cfg = new(ServeConfig)
 	}
-	opts := append(cfg.SpanOpts, tracer.ServiceName(cfg.Service), tracer.ResourceName(cfg.Resource))
-	opts = append(opts, tracer.Tag(ext.HTTPRoute, cfg.Route))
+	opts := options.Copy(cfg.SpanOpts...) // make a copy of cfg.SpanOpts to avoid races
+	if cfg.Service != "" {
+		opts = append(opts, tracer.ServiceName(cfg.Service))
+	}
+	if cfg.Resource != "" {
+		opts = append(opts, tracer.ResourceName(cfg.Resource))
+	}
+	if cfg.Route != "" {
+		opts = append(opts, tracer.Tag(ext.HTTPRoute, cfg.Route))
+	}
 	span, ctx := httptrace.StartRequestSpan(r, opts...)
 	rw, ddrw := wrapResponseWriter(w)
 	defer func() {
@@ -54,7 +71,7 @@ func TraceAndServe(h http.Handler, w http.ResponseWriter, r *http.Request, cfg *
 	}()
 
 	if appsec.Enabled() {
-		h = httpsec.WrapHandler(h, span, cfg.RouteParams)
+		h = httpsec.WrapHandler(h, span, cfg.RouteParams, nil)
 	}
 	h.ServeHTTP(rw, r.WithContext(ctx))
 }

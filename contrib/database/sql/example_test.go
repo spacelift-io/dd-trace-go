@@ -9,14 +9,13 @@ import (
 	"context"
 	"log"
 
-	sqlite "github.com/mattn/go-sqlite3" // Setup application to use Sqlite
-
 	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
+	sqlite "github.com/mattn/go-sqlite3" // Setup application to use Sqlite
 )
 
 func Example() {
@@ -106,4 +105,22 @@ func Example_dbmPropagation() {
 		log.Fatal(err)
 	}
 	defer rows.Close()
+}
+
+func Example_dbStats() {
+	// Register the driver with the WithDBStats option to enable DBStats metric polling
+	sqltrace.Register("postgres", &pq.Driver{}, sqltrace.WithDBStats())
+	// Followed by a call to Open.
+	db, err := sqltrace.Open("postgres", "postgres://pqgotest:password@localhost/pqgotest?sslmode=disable")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Tracing and metric polling is now enabled. Metrics  will be submitted to Datadog with the prefix `datadog.tracer.sql`
+	rows, err := db.Query("SELECT name FROM users WHERE age=?", 27)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rows.Close()
 }

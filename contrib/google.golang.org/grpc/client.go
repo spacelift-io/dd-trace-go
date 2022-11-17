@@ -6,6 +6,7 @@
 package grpc
 
 import (
+	"context"
 	"net"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/google.golang.org/internal/grpcutil"
@@ -14,7 +15,6 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/log"
 
-	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
@@ -38,9 +38,10 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 			cs.Context(),
 			cs.method,
 			"grpc.message",
-			cs.cfg.clientServiceName(),
+			cs.cfg.serviceName,
 			cs.cfg.startSpanOptions()...,
 		)
+		span.SetTag(ext.Component, componentName)
 		if p, ok := peer.FromContext(cs.Context()); ok {
 			setSpanTargetFromPeer(span, *p)
 		}
@@ -56,9 +57,10 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 			cs.Context(),
 			cs.method,
 			"grpc.message",
-			cs.cfg.clientServiceName(),
+			cs.cfg.serviceName,
 			cs.cfg.startSpanOptions()...,
 		)
+		span.SetTag(ext.Component, componentName)
 		if p, ok := peer.FromContext(cs.Context()); ok {
 			setSpanTargetFromPeer(span, *p)
 		}
@@ -72,7 +74,7 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 // streams using the given set of options.
 func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 	cfg := new(config)
-	defaults(cfg)
+	clientDefaults(cfg)
 	for _, fn := range opts {
 		fn(cfg)
 	}
@@ -95,7 +97,7 @@ func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 				span tracer.Span
 				err  error
 			)
-			span, ctx, err = doClientRequest(ctx, cfg, method, methodKind, opts,
+			span, ctx, err = doClientRequest(ctx, cfg, method, methodKind, cc, opts,
 				func(ctx context.Context, opts []grpc.CallOption) error {
 					var err error
 					stream, err = streamer(ctx, desc, cc, method, opts...)
@@ -143,7 +145,7 @@ func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 // the given set of options.
 func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 	cfg := new(config)
-	defaults(cfg)
+	clientDefaults(cfg)
 	for _, fn := range opts {
 		fn(cfg)
 	}
@@ -152,7 +154,7 @@ func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 		if _, ok := cfg.untracedMethods[method]; ok {
 			return invoker(ctx, method, req, reply, cc, opts...)
 		}
-		span, _, err := doClientRequest(ctx, cfg, method, methodKindUnary, opts,
+		span, _, err := doClientRequest(ctx, cfg, method, methodKindUnary, cc, opts,
 			func(ctx context.Context, opts []grpc.CallOption) error {
 				return invoker(ctx, method, req, reply, cc, opts...)
 			})
@@ -164,21 +166,27 @@ func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 // doClientRequest starts a new span and invokes the handler with the new context
 // and options. The span should be finished by the caller.
 func doClientRequest(
-	ctx context.Context, cfg *config, method string, methodKind string, opts []grpc.CallOption,
+	ctx context.Context, cfg *config, method string, methodKind string, cc *grpc.ClientConn, opts []grpc.CallOption,
 	handler func(ctx context.Context, opts []grpc.CallOption) error,
 ) (ddtrace.Span, context.Context, error) {
 	// inject the trace id into the metadata
 	span, ctx := startSpanFromContext(
 		ctx,
 		method,
-		"grpc.client",
-		cfg.clientServiceName(),
-		cfg.startSpanOptions()...,
+		cfg.spanName,
+		cfg.serviceName,
+		cfg.startSpanOptions(
+			tracer.Tag(ext.Component, componentName),
+			tracer.Tag(ext.SpanKind, ext.SpanKindClient))...,
 	)
 	if methodKind != "" {
 		span.SetTag(tagMethodKind, methodKind)
 	}
-
+	if cc != nil {
+		if host, _, err := net.SplitHostPort(cc.Target()); err == nil {
+			span.SetTag(ext.PeerHostname, host)
+		}
+	}
 	// fill in the peer so we can add it to the tags
 	var p peer.Peer
 	opts = append(opts, grpc.Peer(&p))
@@ -195,10 +203,10 @@ func doClientRequest(
 func setSpanTargetFromPeer(span ddtrace.Span, p peer.Peer) {
 	// if the peer was set, set the tags
 	if p.Addr != nil {
-		host, port, err := net.SplitHostPort(p.Addr.String())
+		ip, port, err := net.SplitHostPort(p.Addr.String())
 		if err == nil {
-			if host != "" {
-				span.SetTag(ext.TargetHost, host)
+			if ip != "" {
+				span.SetTag(ext.TargetHost, ip)
 			}
 			span.SetTag(ext.TargetPort, port)
 		}

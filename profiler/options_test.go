@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/globalconfig"
+
 	"github.com/DataDog/datadog-go/v5/statsd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"gopkg.in/DataDog/dd-trace-go.v1/internal/globalconfig"
 )
 
 // testAPIKey is an example API key for validation purposes
@@ -201,7 +201,7 @@ func TestOptions(t *testing.T) {
 	t.Run("WithVersion", func(t *testing.T) {
 		var cfg config
 		WithVersion("1.2.3")(&cfg)
-		assert.Contains(t, cfg.tags.Slice(), "version:1.2.3")
+		assert.Equal(t, cfg.version, "1.2.3")
 	})
 
 	t.Run("WithVersion/override", func(t *testing.T) {
@@ -209,7 +209,7 @@ func TestOptions(t *testing.T) {
 		cfg, err := defaultConfig()
 		require.NoError(t, err)
 		WithVersion("1.2.3")(cfg)
-		assert.Contains(t, cfg.tags.Slice(), "version:1.2.3")
+		assert.Equal(t, cfg.version, "1.2.3")
 	})
 
 	t.Run("WithTags", func(t *testing.T) {
@@ -311,7 +311,7 @@ func TestEnvVars(t *testing.T) {
 		t.Setenv("DD_VERSION", "1.2.3")
 		cfg, err := defaultConfig()
 		require.NoError(t, err)
-		assert.Contains(t, cfg.tags.Slice(), "version:1.2.3")
+		assert.Equal(t, cfg.version, "1.2.3")
 	})
 
 	t.Run("DD_TAGS", func(t *testing.T) {
@@ -322,6 +322,16 @@ func TestEnvVars(t *testing.T) {
 		assert.Contains(t, tags, "a:1")
 		assert.Contains(t, tags, "b:2")
 		assert.Contains(t, tags, "c:3")
+	})
+
+	t.Run("DD_TAGS_SPACES", func(t *testing.T) {
+		t.Setenv("DD_TAGS", "a:1 b:2 c")
+		cfg, err := defaultConfig()
+		require.NoError(t, err)
+		tags := cfg.tags.Slice()
+		assert.Contains(t, tags, "a:1")
+		assert.Contains(t, tags, "b:2")
+		assert.Contains(t, tags, "c")
 	})
 
 	t.Run("DD_PROFILING_DELTA", func(t *testing.T) {
