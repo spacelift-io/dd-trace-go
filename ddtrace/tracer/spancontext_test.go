@@ -908,3 +908,15 @@ func FuzzSpanIDHexEncoded(f *testing.F) {
 		}
 	})
 }
+
+func TestTraceIDHexEncoded(t *testing.T) {
+	tid := traceID([16]byte{})
+	tid[15] = 5
+	assert.Equal(t, "00000000000000000000000000000005", tid.HexEncoded())
+}
+
+func TestTraceIDEmpty(t *testing.T) {
+	tid := traceID([16]byte{})
+	tid[15] = 5
+	assert.False(t, tid.Empty())
+}

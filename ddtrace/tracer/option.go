@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -164,7 +165,7 @@ type config struct {
 	globalTags dynamicConfig[map[string]interface{}]
 
 	traceWriter traceWriter
-	
+
 	// transport specifies the Transport interface which will be used to send data to the agent.
 	transport transport
 

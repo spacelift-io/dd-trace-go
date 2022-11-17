@@ -148,7 +148,7 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 	size := p.size()
 
 	try := func() (body io.ReadCloser, err error) {
-		req, err := http.NewRequest("POST", t.traceURL, bytes.NewReader(buf.Bytes()))
+		req, err := http.NewRequest("POST", t.traceURL, p)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create http request: %v", err)
 		}
@@ -168,9 +168,11 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 				req.Header.Set("Datadog-Client-Computed-Stats", "yes")
 			}
 			droppedTraces := int(atomic.SwapUint32(&t.droppedP0Traces, 0))
+			partialTraces := int(atomic.SwapUint32(&t.partialTraces, 0))
 			droppedSpans := int(atomic.SwapUint32(&t.droppedP0Spans, 0))
-			if stats := t.config.statsd; stats != nil {
+			if stats := t.statsd; stats != nil {
 				stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces),
+					[]string{fmt.Sprintf("partial:%s", strconv.FormatBool(partialTraces > 0))}, 1)
 				stats.Count("datadog.tracer.dropped_p0_spans", int64(droppedSpans), nil, 1)
 			}
 			req.Header.Set("Datadog-Client-Dropped-P0-Traces", strconv.Itoa(droppedTraces))
@@ -192,9 +194,9 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 			}
 			return nil, fmt.Errorf("%s", txt)
 		}
-
 		return response.Body, nil
 	}
+
 	for i := 0; i < 3; i++ {
 		if i != 0 {
 			time.Sleep(time.Second * 2 * time.Duration(i))

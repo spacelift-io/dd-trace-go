@@ -23,7 +23,6 @@ package dyngo
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/orchestrion"
 )

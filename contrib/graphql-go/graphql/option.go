@@ -6,8 +6,8 @@
 package graphql
 
 import (
-	"math"
-
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal/namingschema"
 )
@@ -34,9 +34,7 @@ func defaults(cfg *config) {
 func WithAnalytics(on bool) Option {
 	return func(cfg *config) {
 		if on {
-			cfg.analyticsRate = 1.0
-		} else {
-			cfg.analyticsRate = math.NaN()
+			WithSpanOptions(tracer.AnalyticsRate(1.0))(cfg)
 		}
 	}
 }
@@ -46,9 +44,7 @@ func WithAnalytics(on bool) Option {
 func WithAnalyticsRate(rate float64) Option {
 	return func(cfg *config) {
 		if rate >= 0.0 && rate <= 1.0 {
-			cfg.analyticsRate = rate
-		} else {
-			cfg.analyticsRate = math.NaN()
+			WithSpanOptions(tracer.AnalyticsRate(rate))(cfg)
 		}
 	}
 }

@@ -242,6 +242,11 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	} else {
 		writer = newAgentTraceWriter(c, sampler, statsd)
 	}
+
+	if c.traceWriter != nil {
+		writer = c.traceWriter
+	}
+
 	traces, spans, err := samplingRulesFromEnv()
 	if err != nil {
 		log.Warn("DIAGNOSTICS Error(s) parsing sampling rules: found errors:%s", err)
@@ -267,6 +272,13 @@ func newUnstartedTracer(opts ...StartOption) *tracer {
 	if c.dataStreamsMonitoringEnabled {
 		dataStreamsProcessor = datastreams.NewProcessor(statsd, c.env, c.serviceName, c.version, c.agentURL, c.httpClient)
 	}
+	c.traceSampleRules = newDynamicConfig("trace_sample_rules", c.traceRules,
+		rulesSampler.traces.setTraceSampleRules, EqualsFalseNegative)
+	var dataStreamsProcessor *datastreams.Processor
+	if c.dataStreamsMonitoringEnabled {
+		dataStreamsProcessor = datastreams.NewProcessor(statsd, c.env, c.serviceName, c.version, c.agentURL, c.httpClient)
+	}
+
 	t := &tracer{
 		config:           c,
 		traceWriter:      writer,

@@ -14,6 +14,13 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/contrib/cloud.google.com/go/pubsub.v1/internal/tracing"
 )
 
+const componentName = "cloud.google.com/go/pubsub.v1"
+
+func init() {
+	telemetry.LoadIntegration(componentName)
+	tracer.MarkIntegrationImported(componentName)
+}
+
 // Publish publishes a message on the specified topic and returns a PublishResult.
 // This function is functionally equivalent to t.Publish(ctx, msg), but it also starts a publish
 // span and it ensures that the tracing metadata is propagated as attributes attached to

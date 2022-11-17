@@ -284,3 +284,23 @@ func (s *mockspan) Root() tracer.Span {
 	root, _ := current.(*mockspan)
 	return root
 }
+
+// Root walks the span up to the root parent span and returns it.
+// This method is required by some internal packages such as appsec.
+func (s *mockspan) Root() tracer.Span {
+	openSpans := s.tracer.openSpans
+	var current Span = s
+	for {
+		pid := current.ParentID()
+		if pid == 0 {
+			break
+		}
+		parent, ok := openSpans[pid]
+		if !ok {
+			break
+		}
+		current = parent
+	}
+	root, _ := current.(*mockspan)
+	return root
+}
