@@ -36,12 +36,12 @@
 //	      // sample 30% of traces when the span name is "db.query" and the service
 //	      // is "postgres.db"
 //	      tracer.NameServiceRule("db.query", "postgres.db", 0.3),
-//	      // sample 100% of traces when service and name match these regular expressions
-//	      {Service: regexp.MustCompile("^test-"), Name: regexp.MustCompile("http\\..*"), Rate: 1.0},
+//	      // sample 100% of traces when name and service match these regular expressions
+//	      {Name: regexp.MustCompile("web\\..*"), Service: regexp.MustCompile("^test-"), Rate: 1.0},
 //	      // sample 50% of spans when service and name match these glob patterns with no limit on the number of spans
-//	      tracer.SpanNameServiceRule("^test-", "http\\..*", 0.5),
+//	      tracer.SpanNameServiceRule("web.*", "test-*", 0.5),
 //	      // sample 50% of spans when service and name match these glob patterns up to 100 spans per second
-//	      tracer.SpanNameServiceMPSRule("^test-", "http\\..*", 0.5, 100),
+//	      tracer.SpanNameServiceMPSRule("web.*", "test-*", 0.5, 100),
 //	}
 //	tracer.Start(tracer.WithSamplingRules(rules))
 //	defer tracer.Stop()
@@ -85,7 +85,8 @@
 // with our propagation algorithm as long as they implement the TextMapReader and TextMapWriter
 // interfaces. An example alternate implementation is the MDCarrier in our gRPC integration.
 //
-// As an example, injecting a span's context into an HTTP request would look like this:
+// As an example, injecting a span's context into an HTTP request would look like this.
+// (See the net/http contrib package for more examples https://pkg.go.dev/gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http):
 //
 //	req, err := http.NewRequest("GET", "http://example.com", nil)
 //	// ...
