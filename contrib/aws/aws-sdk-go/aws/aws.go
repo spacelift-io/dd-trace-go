@@ -65,8 +65,9 @@ func WrapSession(s *session.Session, opts ...Option) *session.Session {
 		Name: SendHandlerName,
 		Fn:   h.Send,
 	})
-	s.Handlers.Complete.PushBackNamed(request.NamedHandler{
+	s.Handlers.CompleteAttempt.PushBackNamed(request.NamedHandler{
 		Name: CompleteHandlerName,
+		Fn:   h.Complete,
 	})
 	return s
 }
