@@ -32,6 +32,15 @@ func (c ProducerMessageCarrier) ForeachKey(handler func(key, val string) error) 
 	return nil
 }
 
+func (c ProducerMessageCarrier) HasKey(key string) bool {
+	for _, h := range c.msg.Headers {
+		if string(h.Key) == key {
+			return true
+		}
+	}
+	return false
+}
+
 // Set sets a header.
 func (c ProducerMessageCarrier) Set(key, val string) {
 	// ensure uniqueness of keys
@@ -78,6 +87,15 @@ func (c ConsumerMessageCarrier) ForeachKey(handler func(key, val string) error) 
 		}
 	}
 	return nil
+}
+
+func (c ConsumerMessageCarrier) HasKey(key string) bool {
+	for _, h := range c.msg.Headers {
+		if h != nil && string(h.Key) == key {
+			return true
+		}
+	}
+	return false
 }
 
 // Set sets a header.

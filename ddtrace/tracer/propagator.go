@@ -37,6 +37,10 @@ type TextMapReader interface {
 	// using all key/value pairs as arguments. ForeachKey will return
 	// the first error returned by the handler.
 	ForeachKey(handler func(key, val string) error) error
+
+	// HasKey returns true if the given key exists in the underlying
+	// carrier.
+	HasKey(key string) bool
 }
 
 var (

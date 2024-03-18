@@ -33,6 +33,16 @@ func (c messageCarrier) ForeachKey(handler func(key, val string) error) error {
 	return nil
 }
 
+// HasKey conforms to the TextMapReader interface.
+func (c messageCarrier) HasKey(key string) bool {
+	for _, h := range c.msg.Headers {
+		if h.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
 // Set implements TextMapWriter
 func (c messageCarrier) Set(key, val string) {
 	// ensure uniqueness of keys

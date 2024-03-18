@@ -42,6 +42,11 @@ func (c HTTPHeadersCarrier) ForeachKey(handler func(key, val string) error) erro
 	return nil
 }
 
+func (c HTTPHeadersCarrier) HasKey(key string) bool {
+	_, ok := c[key]
+	return ok
+}
+
 // TextMapCarrier allows the use of a regular map[string]string as both TextMapWriter
 // and TextMapReader, making it compatible with the provided Propagator.
 type TextMapCarrier map[string]string
@@ -62,6 +67,11 @@ func (c TextMapCarrier) ForeachKey(handler func(key, val string) error) error {
 		}
 	}
 	return nil
+}
+
+func (c TextMapCarrier) HasKey(key string) bool {
+	_, ok := c[key]
+	return ok
 }
 
 const (
@@ -122,6 +132,11 @@ type PropagatorConfig struct {
 	// B3 specifies if B3 headers should be added for trace propagation.
 	// See https://github.com/openzipkin/b3-propagation
 	B3 bool
+
+	// ExtractWhen defines a function that is executed before trying to extract
+	// a span context from a carrier. If the function returns false, the extraction
+	// is skipped.
+	ExtractWhen func(textMapReader TextMapReader) bool
 }
 
 // NewPropagator returns a new propagator which uses TextMap to inject
@@ -313,6 +328,12 @@ func (p *propagator) Extract(carrier interface{}) (ddtrace.SpanContext, error) {
 }
 
 func (p *propagator) extractTextMap(reader TextMapReader) (ddtrace.SpanContext, error) {
+	if p.cfg.ExtractWhen != nil {
+		if !p.cfg.ExtractWhen(reader) {
+			return nil, ErrSpanContextNotFound
+		}
+	}
+
 	var ctx spanContext
 	err := reader.ForeachKey(func(k, v string) error {
 		var err error

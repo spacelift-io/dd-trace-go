@@ -161,7 +161,7 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 			droppedTraces := int(atomic.SwapUint32(&t.droppedP0Traces, 0))
 			droppedSpans := int(atomic.SwapUint32(&t.droppedP0Spans, 0))
 			if stats := t.config.statsd; stats != nil {
-				stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces),
+				stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces), nil, 1)
 				stats.Count("datadog.tracer.dropped_p0_spans", int64(droppedSpans), nil, 1)
 			}
 			req.Header.Set("Datadog-Client-Dropped-P0-Traces", strconv.Itoa(droppedTraces))

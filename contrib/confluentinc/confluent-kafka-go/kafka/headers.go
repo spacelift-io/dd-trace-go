@@ -32,6 +32,15 @@ func (c MessageCarrier) ForeachKey(handler func(key, val string) error) error {
 	return nil
 }
 
+func (c MessageCarrier) HasKey(key string) bool {
+	for _, h := range c.msg.Headers {
+		if h.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
 // Set sets a header.
 func (c MessageCarrier) Set(key, val string) {
 	// ensure uniqueness of keys

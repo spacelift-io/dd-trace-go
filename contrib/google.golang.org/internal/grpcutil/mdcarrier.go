@@ -47,3 +47,9 @@ func (mdc MDCarrier) ForeachKey(handler func(key, val string) error) error {
 	}
 	return nil
 }
+
+// HasKey returns true if the metadata has the given key.
+func (mdc MDCarrier) HasKey(key string) bool {
+	_, ok := mdc[key]
+	return ok
+}
