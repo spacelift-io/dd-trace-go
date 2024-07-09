@@ -55,14 +55,14 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/segmentio/kafka-go v0.4.29
 	github.com/sirupsen/logrus v1.7.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.9.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tidwall/buntdb v1.2.0
 	github.com/tinylib/msgp v1.1.6
 	github.com/twitchtv/twirp v8.1.1+incompatible
 	github.com/urfave/negroni v1.0.0
 	github.com/valyala/fasthttp v1.34.0 // indirect
-	github.com/vektah/gqlparser/v2 v2.2.0
+	github.com/vektah/gqlparser/v2 v2.5.15
 	github.com/vmihailenco/msgpack/v5 v5.3.4 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/zenazn/goji v1.0.1
@@ -93,7 +93,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.2+incompatible // indirect
 	github.com/DataDog/zstd v1.3.5 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/agnivade/levenshtein v1.1.0 // indirect
+	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/armon/go-metrics v0.3.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.0.0 // indirect
