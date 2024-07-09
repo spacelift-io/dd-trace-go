@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -38,19 +39,21 @@ var defaultDialer = &net.Dialer{
 	DualStack: true,
 }
 
-var defaultClient = &http.Client{
-	// We copy the transport to avoid using the default one, as it might be
-	// augmented with tracing and we don't want these calls to be recorded.
-	// See https://golang.org/pkg/net/http/#DefaultTransport .
-	Transport: &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           defaultDialer.DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	},
-	Timeout: defaultHTTPTimeout,
+func defaultHTTPClient(timeout time.Duration) *http.Client {
+	if timeout == 0 {
+		timeout = defaultHTTPTimeout
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           defaultDialer.DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Timeout: timeout,
+	}
 }
 
 const (
@@ -58,7 +61,7 @@ const (
 	defaultPort        = "8126"
 	defaultAddress     = defaultHostname + ":" + defaultPort
 	defaultURL         = "http://" + defaultAddress
-	defaultHTTPTimeout = 2 * time.Second         // defines the current timeout before giving up with the send process
+	defaultHTTPTimeout = 10 * time.Second        // defines the current timeout before giving up with the send process
 	traceCountHeader   = "X-Datadog-Trace-Count" // header containing the number of traces in the payload
 )
 
@@ -98,6 +101,9 @@ func newHTTPTransport(url string, client *http.Client) *httpTransport {
 	}
 	if cid := internal.ContainerID(); cid != "" {
 		defaultHeaders["Datadog-Container-ID"] = cid
+	}
+	if eid := internal.EntityID(); eid != "" {
+		defaultHeaders["Datadog-Entity-ID"] = eid
 	}
 	return &httpTransport{
 		traceURL: fmt.Sprintf("%s/v0.4/traces", url),
@@ -144,7 +150,7 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 	size := p.size()
 
 	try := func() (body io.ReadCloser, err error) {
-		req, err := http.NewRequest("POST", t.traceURL, bytes.NewReader(buf.Bytes()))
+		req, err := http.NewRequest("POST", t.traceURL, p)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create http request: %v", err)
 		}
@@ -159,9 +165,11 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 				req.Header.Set("Datadog-Client-Computed-Stats", "yes")
 			}
 			droppedTraces := int(atomic.SwapUint32(&t.droppedP0Traces, 0))
+			partialTraces := int(atomic.SwapUint32(&t.partialTraces, 0))
 			droppedSpans := int(atomic.SwapUint32(&t.droppedP0Spans, 0))
-			if stats := t.config.statsd; stats != nil {
+			if stats := t.statsd; stats != nil {
 				stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces),
+					[]string{fmt.Sprintf("partial:%s", strconv.FormatBool(partialTraces > 0))}, 1)
 				stats.Count("datadog.tracer.dropped_p0_spans", int64(droppedSpans), nil, 1)
 			}
 			req.Header.Set("Datadog-Client-Dropped-P0-Traces", strconv.Itoa(droppedTraces))
@@ -183,9 +191,9 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 			}
 			return nil, fmt.Errorf("%s", txt)
 		}
-
 		return response.Body, nil
 	}
+
 	for i := 0; i < 3; i++ {
 		if i != 0 {
 			time.Sleep(time.Second * 2 * time.Duration(i))
@@ -207,7 +215,7 @@ func (t *httpTransport) endpoint() string {
 // resolveAgentAddr resolves the given agent address and fills in any missing host
 // and port using the defaults. Some environment variable settings will
 // take precedence over configuration.
-func resolveAgentAddr() string {
+func resolveAgentAddr() *url.URL {
 	var host, port string
 	if v := os.Getenv("DD_AGENT_HOST"); v != "" {
 		host = v
@@ -215,11 +223,20 @@ func resolveAgentAddr() string {
 	if v := os.Getenv("DD_TRACE_AGENT_PORT"); v != "" {
 		port = v
 	}
+	if _, err := os.Stat(defaultSocketAPM); host == "" && port == "" && err == nil {
+		return &url.URL{
+			Scheme: "unix",
+			Path:   defaultSocketAPM,
+		}
+	}
 	if host == "" {
 		host = defaultHostname
 	}
 	if port == "" {
 		port = defaultPort
 	}
-	return fmt.Sprintf("%s:%s", host, port)
+	return &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", host, port),
+	}
 }

@@ -9,13 +9,48 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/mocktracer"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/log"
+	"gopkg.in/DataDog/dd-trace-go.v1/internal/normalizer"
+
+	"github.com/DataDog/appsec-internal-go/netip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/mocktracer"
 )
+
+func TestHeaderTagsFromRequest(t *testing.T) {
+	mt := mocktracer.Start()
+	defer mt.Stop()
+
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+	r.Header.Set("header1", "val1")
+	r.Header.Set("header2", " val2 ")
+	r.Header.Set("header3", "v a l 3")
+
+	expectedHeaderTags := map[string]string{
+		"tag1": "val1",
+		"tag2": "val2",
+		"tag3": "v a l 3",
+	}
+
+	hs := []string{"header1:tag1", "header2:tag2", "header3:tag3"}
+	ht := internal.NewLockMap(normalizer.HeaderTagSlice(hs))
+	s, _ := StartRequestSpan(r, HeaderTagsFromRequest(r, ht))
+	s.Finish()
+	spans := mt.FinishedSpans()
+	require.Len(t, spans, 1)
+
+	for expectedTag, expectedTagVal := range expectedHeaderTags {
+		assert.Equal(t, expectedTagVal, spans[0].Tags()[expectedTag])
+	}
+}
 
 func TestStartRequestSpan(t *testing.T) {
 	mt := mocktracer.Start()
@@ -24,9 +59,91 @@ func TestStartRequestSpan(t *testing.T) {
 	s, _ := StartRequestSpan(r)
 	s.Finish()
 	spans := mt.FinishedSpans()
-
 	require.Len(t, spans, 1)
 	assert.Equal(t, "example.com", spans[0].Tag("http.host"))
+}
+
+// TestClientIP tests behavior of StartRequestSpan based on
+// the DD_TRACE_CLIENT_IP_ENABLED environment variable
+func TestTraceClientIPFlag(t *testing.T) {
+	mt := mocktracer.Start()
+	defer mt.Stop()
+
+	tp := new(log.RecordLogger)
+	defer log.UseLogger(tp)()
+
+	// use 0.0.0.0 as ip address of all test cases
+	// more comprehensive ip address testing is done in testing
+	// of ClientIPTags in appsec/dyngo/instrumentation/httpsec
+	validIPAddr := "0.0.0.0"
+
+	type ipTestCase struct {
+		name                string
+		remoteAddr          string
+		traceClientIPEnvVal string
+		expectTrace         bool
+		expectedIP          netip.Addr
+	}
+
+	oldConfig := cfg
+	defer func() { cfg = oldConfig }()
+
+	for _, tc := range []ipTestCase{
+		{
+			name:                "Trace client IP set to true",
+			remoteAddr:          validIPAddr,
+			expectedIP:          netip.MustParseAddr(validIPAddr),
+			traceClientIPEnvVal: "true",
+			expectTrace:         true,
+		},
+		{
+			name:                "Trace client IP set to false",
+			remoteAddr:          validIPAddr,
+			expectedIP:          netip.MustParseAddr(validIPAddr),
+			traceClientIPEnvVal: "false",
+			expectTrace:         false,
+		},
+		{
+			name:                "Trace client IP unset",
+			remoteAddr:          validIPAddr,
+			expectedIP:          netip.MustParseAddr(validIPAddr),
+			traceClientIPEnvVal: "",
+			expectTrace:         false,
+		},
+		{
+			name:                "Trace client IP set to non-boolean value",
+			remoteAddr:          validIPAddr,
+			expectedIP:          netip.MustParseAddr(validIPAddr),
+			traceClientIPEnvVal: "asdadsasd",
+			expectTrace:         false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envTraceClientIPEnabled, tc.traceClientIPEnvVal)
+
+			// reset config based on new DD_TRACE_CLIENT_IP_ENABLED value
+			cfg = newConfig()
+
+			r := httptest.NewRequest(http.MethodGet, "/somePath", nil)
+			r.RemoteAddr = tc.remoteAddr
+			s, _ := StartRequestSpan(r)
+			s.Finish()
+			spans := mt.FinishedSpans()
+			targetSpan := spans[0]
+
+			if tc.expectTrace {
+				assert.Equal(t, tc.expectedIP.String(), targetSpan.Tag(ext.HTTPClientIP))
+			} else {
+				assert.NotContains(t, targetSpan.Tags(), ext.HTTPClientIP)
+				if _, err := strconv.ParseBool(tc.traceClientIPEnvVal); err != nil && tc.traceClientIPEnvVal != "" {
+					logs := tp.Logs()
+					assert.Contains(t, logs[len(logs)-1], "Non-boolean value for env var DD_TRACE_CLIENT_IP_ENABLED")
+					tp.Reset()
+				}
+			}
+			mt.Reset()
+		})
+	}
 }
 
 func TestURLTag(t *testing.T) {
@@ -120,5 +237,23 @@ func TestURLTag(t *testing.T) {
 			url := urlFromRequest(&r)
 			require.Equal(t, tc.expectedURL, url)
 		})
+	}
+}
+
+func BenchmarkStartRequestSpan(b *testing.B) {
+	b.ReportAllocs()
+	r, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		b.Errorf("Failed to create request: %v", err)
+		return
+	}
+	opts := []ddtrace.StartSpanOption{
+		tracer.ServiceName("SomeService"),
+		tracer.ResourceName("SomeResource"),
+		tracer.Tag(ext.HTTPRoute, "/some/route/?"),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		StartRequestSpan(r, opts...)
 	}
 }

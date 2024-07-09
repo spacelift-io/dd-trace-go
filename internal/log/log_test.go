@@ -127,6 +127,55 @@ func TestLog(t *testing.T) {
 	})
 }
 
+func TestRecordLoggerIgnore(t *testing.T) {
+	tp := new(RecordLogger)
+	tp.Ignore("appsec")
+	tp.Log("this is an appsec log")
+	tp.Log("this is a tracer log")
+	assert.Len(t, tp.Logs(), 1)
+	assert.NotContains(t, tp.Logs()[0], "appsec")
+	tp.Reset()
+	tp.Log("this is an appsec log")
+	assert.Len(t, tp.Logs(), 1)
+	assert.Contains(t, tp.Logs()[0], "appsec")
+}
+
+func TestSetLoggingRate(t *testing.T) {
+	testCases := []struct {
+		input  string
+		result time.Duration
+	}{
+		{
+			input:  "",
+			result: time.Minute,
+		},
+		{
+			input:  "0",
+			result: 0 * time.Second,
+		},
+		{
+			input:  "10",
+			result: 10 * time.Second,
+		},
+		{
+			input:  "-1",
+			result: time.Minute,
+		},
+		{
+			input:  "this is not a number",
+			result: time.Minute,
+		},
+	}
+	for _, tC := range testCases {
+		tC := tC
+		errrate = time.Minute // reset global variable
+		t.Run(tC.input, func(t *testing.T) {
+			setLoggingRate(tC.input)
+			assert.Equal(t, tC.result, errrate)
+		})
+	}
+}
+
 func BenchmarkError(b *testing.B) {
 	Error("k %s", "a") // warm up cache
 	for i := 0; i < b.N; i++ {
