@@ -83,7 +83,7 @@ require (
 	gorm.io/driver/sqlserver v1.0.4
 	gorm.io/gorm v1.20.6
 	inet.af/netaddr v0.0.0-20220617031823-097006376321
-	k8s.io/apimachinery v0.17.0
+	k8s.io/apimachinery v0.17.9
 	k8s.io/client-go v0.17.0
 )
 
